@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - {{ app.name }} - DashManager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Logs: {{ app.name }}</h1>
+    <div class="header-actions">
+        <select id="line-count" onchange="updateLogs()">
+            <option value="50" {% if lines_count == 50 %}selected{% endif %}>50 lines</option>
+            <option value="100" {% if lines_count == 100 %}selected{% endif %}>100 lines</option>
+            <option value="200" {% if lines_count == 200 %}selected{% endif %}>200 lines</option>
+        </select>
+        <select id="level-filter" onchange="updateLogs()">
+            <option value="ALL" {% if level_filter == 'ALL' %}selected{% endif %}>All Levels</option>
+            <option value="WARNING" {% if level_filter == 'WARNING' %}selected{% endif %}>Warning+</option>
+            <option value="ERROR" {% if level_filter == 'ERROR' %}selected{% endif %}>Errors Only</option>
+        </select>
+        <label class="checkbox-label">
+            <input type="checkbox" id="auto-refresh-logs">
+            Auto-refresh
+        </label>
+        <button class="btn btn-sm btn-secondary" onclick="copyLogs()">Copy</button>
+    </div>
+</div>
+
+<div class="log-container">
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <pre class="log-output" id="log-output">{% if lines %}{% for line in lines %}{{ line | e }}{% endfor %}{% else %}No log entries{% endif %}</pre>
+</div>
+
+<div class="log-footer">
+    <span>Showing {{ lines|length }} lines from {{ app.log_file }}</span>
+    <label class="checkbox-label">
+        <input type="checkbox" id="auto-scroll" checked>
+        Auto-scroll to bottom
+    </label>
+</div>
+
+<div class="back-link">
+    <a href="{{ url_for('app_detail', name=app.name) }}">&larr; Back to {{ app.name }}</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const appName = "{{ app.name }}";
+    let logRefreshTimer = null;
+
+    function updateLogs() {
+        const lines = document.getElementById('line-count').value;
+        const level = document.getElementById('level-filter').value;
+        window.location.href = `{{ url_for('logs_page', name=app.name) }}?lines=${lines}&level=${level}`;
+    }
+
+    function copyLogs() {
+        const logOutput = document.getElementById('log-output');
+        navigator.clipboard.writeText(logOutput.textContent).then(() => {
+            showToast('Logs copied to clipboard');
+        });
+    }
+
+    function refreshLogs() {
+        const lines = document.getElementById('line-count').value;
+        const level = document.getElementById('level-filter').value;
+
+        fetch(`/api/app/${appName}/logs?lines=${lines}&level=${level}`)
+            .then(response => response.json())
+            .then(data => {
+                const logOutput = document.getElementById('log-output');
+                if (data.lines && data.lines.length > 0) {
+                    logOutput.textContent = data.lines.join('');
+                } else if (data.error) {
+                    logOutput.textContent = `Error: ${data.error}`;
+                } else {
+                    logOutput.textContent = 'No log entries';
+                }
+
+                if (document.getElementById('auto-scroll').checked) {
+                    logOutput.scrollTop = logOutput.scrollHeight;
+                }
+            });
+    }
+
+    document.getElementById('auto-refresh-logs').addEventListener('change', function() {
+        if (logRefreshTimer) {
+            clearInterval(logRefreshTimer);
+            logRefreshTimer = null;
+        }
+
+        if (this.checked) {
+            logRefreshTimer = setInterval(refreshLogs, 3000);
+        }
+    });
+
+    // Initial scroll to bottom
+    if (document.getElementById('auto-scroll').checked) {
+        const logOutput = document.getElementById('log-output');
+        logOutput.scrollTop = logOutput.scrollHeight;
+    }
+</script>
+{% endblock %}

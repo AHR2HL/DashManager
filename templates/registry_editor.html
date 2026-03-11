@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Registry Editor - DashManager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Registry Editor</h1>
+</div>
+
+<!-- Registered Apps Section -->
+<div class="section">
+    <h2>Registered Apps</h2>
+    {% if apps %}
+    <div class="table-container">
+        <table class="app-table" id="registry-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Path</th>
+                    <th>Port</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for app in apps %}
+                <tr data-app="{{ app.name }}">
+                    <td>{{ app.name }}</td>
+                    <td class="path-cell" title="{{ app.path }}">{{ app.path }}</td>
+                    <td>{{ app.port }}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-secondary" onclick="editApp('{{ app.name }}')">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApp('{{ app.name }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No apps registered yet.</p>
+    {% endif %}
+</div>
+
+<!-- Add New App Section -->
+<div class="section">
+    <h2>Add New App</h2>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('manual')">Add Manually</button>
+        <button class="tab-btn" onclick="showTab('detect')">Auto-Detect</button>
+    </div>
+
+    <!-- Manual Add Tab -->
+    <div id="tab-manual" class="tab-content active">
+        <form id="add-app-form" class="app-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="app-name">Name *</label>
+                    <input type="text" id="app-name" name="name" required
+                           placeholder="my_flask_app" pattern="[a-zA-Z0-9_\-]+"
+                           title="Alphanumeric, underscores, and hyphens only">
+                    <span class="form-hint">Alphanumeric, underscores, hyphens only</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="app-port">Port *</label>
+                    <input type="number" id="app-port" name="port" required
+                           min="1" max="65535" placeholder="5001">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="app-path">Path *</label>
+                    <input type="text" id="app-path" name="path" required
+                           placeholder="C:\projects\my_flask_app">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="app-start-cmd">Start Command *</label>
+                    <input type="text" id="app-start-cmd" name="start_cmd" required
+                           placeholder="C:\projects\my_flask_app\.venv\Scripts\python.exe app.py">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="app-workdir">Working Directory *</label>
+                    <input type="text" id="app-workdir" name="workdir" required
+                           placeholder="C:\projects\my_flask_app">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="app-health-url">Health URL (optional)</label>
+                    <input type="text" id="app-health-url" name="health_url"
+                           placeholder="http://127.0.0.1:5001/health">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="app-log-file">Log File (optional)</label>
+                    <input type="text" id="app-log-file" name="log_file"
+                           placeholder="C:\projects\my_flask_app\logs\app.log">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add App</button>
+                <button type="reset" class="btn btn-secondary">Clear</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Auto-Detect Tab -->
+    <div id="tab-detect" class="tab-content">
+        <div class="detect-form">
+            <div class="form-group">
+                <label for="detect-path">Folder Path</label>
+                <div class="input-group">
+                    <input type="text" id="detect-path" placeholder="C:\projects\my_flask_app">
+                    <button class="btn btn-primary" onclick="scanFolder()">Scan</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="detect-result" class="detect-result" style="display: none;">
+            <h3>Detected Configuration</h3>
+            <div id="detect-info"></div>
+            <div class="form-actions">
+                <button class="btn btn-success" onclick="addDetectedApp()">Add This App</button>
+                <button class="btn btn-secondary" onclick="clearDetection()">Clear</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="edit-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit App: <span id="edit-app-name"></span></h3>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="edit-app-form" class="app-form">
+            <input type="hidden" id="edit-original-name">
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="edit-name">Name *</label>
+                    <input type="text" id="edit-name" name="name" required pattern="[a-zA-Z0-9_\-]+" title="Alphanumeric, underscores, and hyphens only">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-port">Port *</label>
+                    <input type="number" id="edit-port" name="port" required min="1" max="65535">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="edit-path">Path *</label>
+                    <input type="text" id="edit-path" name="path" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="edit-start-cmd">Start Command *</label>
+                    <input type="text" id="edit-start-cmd" name="start_cmd" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="edit-workdir">Working Directory *</label>
+                    <input type="text" id="edit-workdir" name="workdir" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="edit-health-url">Health URL</label>
+                    <input type="text" id="edit-health-url" name="health_url">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="edit-log-file">Log File</label>
+                    <input type="text" id="edit-log-file" name="log_file">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let detectedConfig = null;
+
+    // Tab switching
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    // Add app form
+    document.getElementById('add-app-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetch('/api/registry/app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('App added successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to add app', 'error');
+        }
+    });
+
+    // Auto-detect
+    async function scanFolder() {
+        const path = document.getElementById('detect-path').value.trim();
+        if (!path) {
+            showToast('Please enter a folder path', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/detect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+
+            const result = await response.json();
+
+            if (result.valid) {
+                detectedConfig = result;
+                displayDetectedConfig(result);
+            } else {
+                showToast(result.error || 'Detection failed', 'error');
+            }
+        } catch (error) {
+            showToast('Failed to scan folder', 'error');
+        }
+    }
+
+    function displayDetectedConfig(config) {
+        const info = document.getElementById('detect-info');
+        info.innerHTML = `
+            <table class="info-table">
+                <tr><th>Name</th><td>${config.name}</td></tr>
+                <tr><th>Path</th><td>${config.path}</td></tr>
+                <tr><th>Port</th><td>${config.port} ${config.scan_info.port_detected ? '(detected)' : '(default)'}</td></tr>
+                <tr><th>Start Command</th><td><code>${config.start_cmd}</code></td></tr>
+                <tr><th>Health URL</th><td>${config.health_url}</td></tr>
+                <tr><th>Log File</th><td>${config.log_file || 'Not detected'}</td></tr>
+                <tr><th>Venv</th><td>${config.scan_info.venv_detected ? 'Detected' : 'Not found'}</td></tr>
+            </table>
+        `;
+        document.getElementById('detect-result').style.display = 'block';
+    }
+
+    async function addDetectedApp() {
+        if (!detectedConfig) return;
+
+        const data = {
+            name: detectedConfig.name,
+            path: detectedConfig.path,
+            port: detectedConfig.port,
+            start_cmd: detectedConfig.start_cmd,
+            workdir: detectedConfig.workdir,
+            health_url: detectedConfig.health_url,
+            log_file: detectedConfig.log_file
+        };
+
+        try {
+            const response = await fetch('/api/registry/app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('App added successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to add app', 'error');
+        }
+    }
+
+    function clearDetection() {
+        detectedConfig = null;
+        document.getElementById('detect-result').style.display = 'none';
+        document.getElementById('detect-path').value = '';
+    }
+
+    // Edit app
+    async function editApp(name) {
+        try {
+            const response = await fetch('/api/registry');
+            const apps = await response.json();
+            const app = apps.find(a => a.name === name);
+
+            if (!app) {
+                showToast('App not found', 'error');
+                return;
+            }
+
+            document.getElementById('edit-original-name').value = name;
+            document.getElementById('edit-app-name').textContent = name;
+            document.getElementById('edit-name').value = app.name;
+            document.getElementById('edit-port').value = app.port;
+            document.getElementById('edit-path').value = app.path;
+            document.getElementById('edit-start-cmd').value = app.start_cmd;
+            document.getElementById('edit-workdir').value = app.workdir;
+            document.getElementById('edit-health-url').value = app.health_url || '';
+            document.getElementById('edit-log-file').value = app.log_file || '';
+
+            document.getElementById('edit-modal').style.display = 'flex';
+        } catch (error) {
+            showToast('Failed to load app details', 'error');
+        }
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').style.display = 'none';
+    }
+
+    document.getElementById('edit-app-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const originalName = document.getElementById('edit-original-name').value;
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetch(`/api/registry/app/${originalName}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('App updated successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to update app', 'error');
+        }
+    });
+
+    // Delete app
+    async function deleteApp(name) {
+        if (!confirm(`Are you sure you want to delete "${name}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/registry/app/${name}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('App deleted successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (error) {
+            showToast('Failed to delete app', 'error');
+        }
+    }
+
+    // Close modal on outside click
+    document.getElementById('edit-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeEditModal();
+        }
+    });
+</script>
+{% endblock %}

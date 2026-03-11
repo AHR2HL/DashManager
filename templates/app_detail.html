@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app.name }} - DashManager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>
+        {{ app.name }}
+        {% if status.running %}
+            <span class="badge badge-running">Running</span>
+        {% else %}
+            <span class="badge badge-stopped">Stopped</span>
+        {% endif %}
+    </h1>
+    <div class="header-actions">
+        {% if status.running %}
+            <form action="{{ url_for('stop_app_route', name=app.name) }}" method="POST" class="inline-form">
+                <button type="submit" class="btn btn-danger">Stop</button>
+            </form>
+            <form action="{{ url_for('restart_app_route', name=app.name) }}" method="POST" class="inline-form">
+                <button type="submit" class="btn btn-warning">Restart</button>
+            </form>
+        {% else %}
+            <form action="{{ url_for('start_app_route', name=app.name) }}" method="POST" class="inline-form">
+                <button type="submit" class="btn btn-success">Start</button>
+            </form>
+        {% endif %}
+        {% if status.running and status.port_open %}
+            <a href="http://127.0.0.1:{{ app.port }}" target="_blank" class="btn btn-primary">Open App</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="detail-card">
+        <h3>Configuration</h3>
+        <table class="info-table">
+            <tr>
+                <th>Path</th>
+                <td>{{ app.path }}</td>
+            </tr>
+            <tr>
+                <th>Port</th>
+                <td>{{ app.port }}</td>
+            </tr>
+            <tr>
+                <th>Start Command</th>
+                <td><code>{{ app.start_cmd }}</code></td>
+            </tr>
+            <tr>
+                <th>Working Directory</th>
+                <td>{{ app.workdir }}</td>
+            </tr>
+            <tr>
+                <th>Health URL</th>
+                <td>{{ app.health_url or 'Not configured' }}</td>
+            </tr>
+            <tr>
+                <th>Log File</th>
+                <td>{{ app.log_file or 'Not configured' }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="detail-card">
+        <h3>Process Info</h3>
+        <table class="info-table">
+            <tr>
+                <th>PID</th>
+                <td>{{ status.pid or '-' }}</td>
+            </tr>
+            <tr>
+                <th>Uptime</th>
+                <td>
+                    {% if status.uptime_seconds %}
+                        {{ status.uptime_seconds | format_uptime }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Last Started</th>
+                <td>{{ status.last_started or '-' }}</td>
+            </tr>
+            <tr>
+                <th>Port Status</th>
+                <td>
+                    {% if status.port_open %}
+                        <span class="badge badge-ok">Open</span>
+                    {% else %}
+                        <span class="badge badge-stopped">Closed</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Health Status</th>
+                <td>
+                    {% if status.healthy is none %}
+                        <span class="badge badge-na">N/A</span>
+                    {% elif status.healthy %}
+                        <span class="badge badge-ok">OK</span>
+                    {% else %}
+                        <span class="badge badge-down">Down</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        {% if status.port_open and port_owner_pid and status.pid and port_owner_pid != status.pid %}
+        <div class="alert alert-warning">
+            <strong>Warning:</strong> Port {{ app.port }} is owned by PID {{ port_owner_pid }},
+            but expected PID {{ status.pid }}. There may be a port conflict.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if app.log_file %}
+<div class="detail-card full-width">
+    <div class="card-header">
+        <h3>Recent Logs</h3>
+        <a href="{{ url_for('logs_page', name=app.name) }}" class="btn btn-sm btn-secondary">View Full Logs</a>
+    </div>
+    {% if log_preview %}
+    <pre class="log-preview">{% for line in log_preview %}{{ line }}{% endfor %}</pre>
+    {% else %}
+    <p class="text-muted">No log entries</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="back-link">
+    <a href="{{ url_for('dashboard') }}">&larr; Back to Dashboard</a>
+</div>
+{% endblock %}

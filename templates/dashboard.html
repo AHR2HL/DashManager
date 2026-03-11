@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DashManager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <div class="header-actions">
+        <label class="checkbox-label">
+            <input type="checkbox" id="auto-refresh" checked>
+            Auto-refresh
+        </label>
+        <select id="refresh-interval">
+            <option value="5000">5s</option>
+            <option value="10000" selected>10s</option>
+            <option value="30000">30s</option>
+            <option value="60000">60s</option>
+        </select>
+    </div>
+</div>
+
+{% if apps %}
+<div class="table-container">
+    <table class="app-table" id="app-table">
+        <thead>
+            <tr>
+                <th>App</th>
+                <th>Port</th>
+                <th>PID</th>
+                <th>Status</th>
+                <th>Health</th>
+                <th>Uptime</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for app, status in apps %}
+            <tr data-app="{{ app.name }}">
+                <td>
+                    <a href="{{ url_for('app_detail', name=app.name) }}">{{ app.name }}</a>
+                </td>
+                <td>{{ app.port }}</td>
+                <td>{{ status.pid or '-' }}</td>
+                <td>
+                    {% if status.state == 'running' %}
+                        <span class="badge badge-running">Running</span>
+                    {% elif status.state == 'port_conflict' %}
+                        <span class="badge badge-warning">Port Conflict</span>
+                    {% elif status.state == 'crashed' %}
+                        <span class="badge badge-danger">Crashed</span>
+                    {% elif status.state == 'unknown_on_port' %}
+                        <span class="badge badge-warning">Unknown on Port</span>
+                    {% else %}
+                        <span class="badge badge-stopped">Stopped</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if status.healthy is none %}
+                        <span class="badge badge-na">N/A</span>
+                    {% elif status.healthy %}
+                        <span class="badge badge-ok">OK</span>
+                    {% else %}
+                        <span class="badge badge-down">Down</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if status.uptime_seconds %}
+                        {{ status.uptime_seconds | format_uptime }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    {% if status.running %}
+                        <form action="{{ url_for('stop_app_route', name=app.name) }}" method="POST" class="inline-form">
+                            <button type="submit" class="btn btn-sm btn-danger">Stop</button>
+                        </form>
+                        <form action="{{ url_for('restart_app_route', name=app.name) }}" method="POST" class="inline-form">
+                            <button type="submit" class="btn btn-sm btn-warning">Restart</button>
+                        </form>
+                    {% else %}
+                        <form action="{{ url_for('start_app_route', name=app.name) }}" method="POST" class="inline-form">
+                            <button type="submit" class="btn btn-sm btn-success">Start</button>
+                        </form>
+                    {% endif %}
+                    {% if app.log_file %}
+                        <a href="{{ url_for('logs_page', name=app.name) }}" class="btn btn-sm btn-secondary">Logs</a>
+                    {% endif %}
+                    {% if status.running and status.port_open %}
+                        <a href="http://127.0.0.1:{{ app.port }}" target="_blank" class="btn btn-sm btn-primary">Open</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h2>No apps registered</h2>
+    <p>Add your first app using the <a href="{{ url_for('registry_editor') }}">Registry Editor</a>.</p>
+</div>
+{% endif %}
+
+<div class="section" style="margin-top: 2rem;">
+    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2>Unknown Listeners</h2>
+            <p class="section-description">Ports in use that aren't registered in DashManager.</p>
+        </div>
+        <div class="filter-controls">
+            <label for="unknown-filter">Show:</label>
+            <select id="unknown-filter" onchange="window.location.href='?unknown_filter=' + this.value">
+                <option value="coded" {% if unknown_filter == 'coded' %}selected{% endif %}>Coded (Python, Node, etc.)</option>
+                <option value="system" {% if unknown_filter == 'system' %}selected{% endif %}>System</option>
+                <option value="all" {% if unknown_filter == 'all' %}selected{% endif %}>All</option>
+            </select>
+        </div>
+    </div>
+    {% if unknown_listeners %}
+    <div class="table-container">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Process</th>
+                    <th>Port</th>
+                    <th>PID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for listener in unknown_listeners %}
+                <tr>
+                    <td>{{ listener.name }}</td>
+                    <td>{{ listener.port }}</td>
+                    <td>{{ listener.pid }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-message" style="color: var(--text-secondary); padding: 1rem 0;">No unknown listeners found.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dashboard auto-refresh
+    let refreshTimer = null;
+
+    function startAutoRefresh() {
+        const checkbox = document.getElementById('auto-refresh');
+        const intervalSelect = document.getElementById('refresh-interval');
+
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+        }
+
+        if (checkbox.checked) {
+            const interval = parseInt(intervalSelect.value);
+            refreshTimer = setInterval(() => {
+                location.reload();
+            }, interval);
+        }
+    }
+
+    document.getElementById('auto-refresh').addEventListener('change', startAutoRefresh);
+    document.getElementById('refresh-interval').addEventListener('change', startAutoRefresh);
+
+    startAutoRefresh();
+</script>
+{% endblock %}

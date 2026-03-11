@@ -1,0 +1,15 @@
+apps:
+- name: SocSci_Coaching
+  path: C:\Users\Adam Work\PycharmProjects\coaching_coach
+  port: 5000
+  start_cmd: .venv\Scripts\python.exe coaching_dashboard.py
+  workdir: C:\Users\Adam Work\PycharmProjects\coaching_coach
+  health_url: http://127.0.0.1:5000/health
+  log_file: C:\Users\Adam Work\PycharmProjects\coaching_coach\logs\app.log
+- name: CSAnalysis
+  path: C:\Users\Adam Work\PycharmProjects\CSAnalysis
+  port: 5001
+  start_cmd: .venv\Scripts\python.exe run_web.py
+  workdir: C:\Users\Adam Work\PycharmProjects\CSAnalysis
+  health_url: http://127.0.0.1:5001/health
+  log_file: C:\Users\Adam Work\PycharmProjects\CSAnalysis\logs\app.log
