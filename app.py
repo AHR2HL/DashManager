@@ -1,6 +1,9 @@
 """DashManager - Flask App Manager Dashboard."""
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import os
+import sys
+import time
+import threading
 
 from config import MANAGER_HOST, MANAGER_PORT
 from modules import ManagedApp, AppStatus
@@ -418,6 +421,39 @@ def api_unknown_ports():
     filter_type = request.args.get("filter", "all")
     unknown = get_unknown_listeners(registered, MANAGER_PORT, filter_type)
     return jsonify({"unknown_ports": unknown, "count": len(unknown), "filter": filter_type})
+
+
+# =============================================================================
+# Server Management Routes
+# =============================================================================
+
+
+def _restart_server():
+    """Restart the server by touching app.py to trigger werkzeug reloader."""
+    time.sleep(0.5)  # Allow response to be sent
+    # Touch app.py to trigger the reloader
+    app_file = os.path.join(os.path.dirname(__file__), "app.py")
+    os.utime(app_file, None)
+
+
+@app.route("/restart-server", methods=["POST"])
+def restart_server():
+    """Restart DashManager server to pick up code changes."""
+    # Start restart in background thread so response can be sent
+    thread = threading.Thread(target=_restart_server)
+    thread.daemon = True
+    thread.start()
+    flash("Server restarting...", "info")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/api/restart-server", methods=["POST"])
+def api_restart_server():
+    """Restart server via API."""
+    thread = threading.Thread(target=_restart_server)
+    thread.daemon = True
+    thread.start()
+    return jsonify({"success": True, "message": "Server restarting..."})
 
 
 # =============================================================================

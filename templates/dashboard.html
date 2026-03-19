@@ -16,6 +16,11 @@
             <option value="30000">30s</option>
             <option value="60000">60s</option>
         </select>
+        <form action="{{ url_for('restart_server') }}" method="POST" class="inline-form" style="margin-left: 1rem;">
+            <button type="submit" class="btn btn-sm btn-secondary" title="Restart DashManager to pick up code changes">
+                ⟳ Refresh Server
+            </button>
+        </form>
     </div>
 </div>
 
