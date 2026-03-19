@@ -47,9 +47,56 @@ def parse_command(cmd: str, workdir: str) -> list[str]:
     return parts
 
 
-def start_app(app: ManagedApp) -> tuple[bool, int | None, str]:
+def force_clear_port(port: int) -> tuple[bool, str]:
+    """
+    Force-kill whatever process is holding a port.
+
+    Returns:
+        (success, message)
+    """
+    from modules.ports import get_pid_on_port
+
+    pid = get_pid_on_port(port)
+    if pid is None:
+        return True, "Port already free"
+
+    logger.info(f"Force-clearing port {port} (owned by PID {pid})")
+
+    try:
+        process = psutil.Process(pid)
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except psutil.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+
+        # Wait a moment for socket to fully release
+        time.sleep(0.5)
+
+        # Verify port is now free
+        new_pid = get_pid_on_port(port)
+        if new_pid is None:
+            logger.info(f"Successfully cleared port {port}")
+            return True, f"Killed PID {pid}"
+        else:
+            return False, f"Port still held by PID {new_pid}"
+
+    except psutil.NoSuchProcess:
+        # Process already gone, but socket may linger
+        time.sleep(1)
+        return True, "Process already gone"
+    except Exception as e:
+        return False, f"Failed to kill PID {pid}: {e}"
+
+
+def start_app(app: ManagedApp, force_clear: bool = True) -> tuple[bool, int | None, str]:
     """
     Start a managed app.
+
+    Args:
+        app: The app to start
+        force_clear: If True, kill any process holding the port before starting
 
     Returns:
         (success, pid, message)
@@ -63,7 +110,14 @@ def start_app(app: ManagedApp) -> tuple[bool, int | None, str]:
         if is_port_open(app.port):
             owner_pid = get_pid_on_port(app.port)
             logger.warning(f"Port {app.port} already in use by PID {owner_pid}")
-            return False, None, f"Port {app.port} is already in use by PID {owner_pid}"
+
+            if force_clear:
+                success, msg = force_clear_port(app.port)
+                if not success:
+                    return False, None, f"Port {app.port} blocked and could not clear: {msg}"
+                logger.info(f"Cleared port {app.port}: {msg}")
+            else:
+                return False, None, f"Port {app.port} is already in use by PID {owner_pid}"
 
         # Create a temp log file to capture startup output
         startup_log = os.path.join(log_dir, f"{app.name}_startup.log")

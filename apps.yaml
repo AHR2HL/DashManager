@@ -13,3 +13,17 @@ apps:
   workdir: C:\Users\Adam Work\PycharmProjects\CSAnalysis
   health_url: http://127.0.0.1:5001/health
   log_file: C:\Users\Adam Work\PycharmProjects\CSAnalysis\logs\app.log
+- name: Rememberizer
+  path: C:\Users\Adam Work\PycharmProjects\rememberizer
+  port: 5002
+  start_cmd: python app.py
+  workdir: C:\Users\Adam Work\PycharmProjects\rememberizer
+  health_url: http://127.0.0.1:5002/
+  log_file: null
+- name: ilma_QC_Dashboard
+  path: C:\Users\Adam Work\PycharmProjects\ilma_QC\ap-complete-qc-system
+  port: 8501
+  start_cmd: .venv\Scripts\streamlit.exe run src/ui.py --server.headless true --server.port 8501
+  workdir: C:\Users\Adam Work\PycharmProjects\ilma_QC\ap-complete-qc-system
+  health_url: http://127.0.0.1:8501/_stcore/health
+  log_file: null
