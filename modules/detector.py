@@ -206,10 +206,9 @@ def build_start_command(path: str, entry_point: str, venv_path: str | None, app_
     if app_type == "streamlit":
         # For Streamlit, use streamlit run command
         if venv_path:
-            # Windows path
-            streamlit_path = os.path.join(venv_path, "Scripts", "streamlit.exe")
-            if not os.path.exists(streamlit_path):
-                # Unix path
+            if os.name == "nt":  # Windows
+                streamlit_path = os.path.join(venv_path, "Scripts", "streamlit.exe")
+            else:  # Unix
                 streamlit_path = os.path.join(venv_path, "bin", "streamlit")
         else:
             streamlit_path = "streamlit"
